@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>toolkit v3.1</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="header">
+    <div class="header-title">toolkit / v3.1</div>
+    <div class="header-status">
+        <span id="connection-status"><span class="status-dot status-offline"></span> <span id="status-text">connecting...</span></span>
+        <span>|</span><span id="server-time">--:--:--</span>
+        <span>|</span><span id="client-ip">--</span>
+    </div>
+</div>
+<div class="container">
+<div class="sidebar">
+    <div class="sidebar-title">MENU</div>
+    <button class="nav-btn active" data-panel="terminal">Terminal</button>
+    <button class="nav-btn" data-panel="system">System Info</button>
+    <button class="nav-btn" data-panel="network">Network Tools</button>
+    <button class="nav-btn" data-panel="nmap">Nmap Scanner</button>
+    <button class="nav-btn" data-panel="wifi">WiFi Tools</button>
+    <button class="nav-btn" data-panel="browser">Browser</button>
+    <button class="nav-btn" data-panel="qrcode">QR Generator</button>
+    <button class="nav-btn" data-panel="clickjack">Clickjack Test</button>
+    <button class="nav-btn" data-panel="ipweapon">IP Weapon</button>
+    <button class="nav-btn" data-panel="subdomain">Subdomain Finder</button>
+    <button class="nav-btn" data-panel="hash">Hash ID & Crack</button>
+    <button class="nav-btn" data-panel="pwgen">Password Gen</button>
+    <button class="nav-btn" data-panel="bandwidth">Bandwidth</button>
+    <button class="nav-btn" data-panel="dns">DNS Lookup</button>
+    <button class="nav-btn" data-panel="encoder">Encode/Decode</button>
+    <button class="nav-btn" data-panel="reverseip">Reverse IP</button>
+    <hr class="sidebar-divider">
+    <button class="nav-btn nav-btn-ctf" data-panel="ctf">CTF Tools</button>
+    <hr class="sidebar-divider">
+    <button class="nav-btn btn-danger" onclick="confirmShutdown()">Shutdown</button>
+</div>
+<div class="main-content">
+
+<!-- TERMINAL PANEL -->
+<div class="panel active" id="panel-terminal">
+    <h2 class="panel-title">Terminal Console</h2>
+    <div class="terminal-container">
+        <div class="terminal-header"><span class="terminal-dot dot-red"></span><span class="terminal-dot dot-yellow"></span><span class="terminal-dot dot-green"></span><span class="terminal-title">toolkit:~#</span></div>
+        <div class="terminal-output" id="terminal-output"><span class="cmd-info">toolkit v3.1 ready.\nType /help for commands.\n</span></div>
+        <div class="terminal-input-row"><span class="terminal-prompt">$</span><input type="text" id="terminal-input" placeholder="type command..." autofocus></div>
+    </div>
+    <div class="quick-cmds">
+        <button class="btn btn-sm" onclick="quickCmd('ls -la')">ls</button>
+        <button class="btn btn-sm" onclick="quickCmd('whoami')">whoami</button>
+        <button class="btn btn-sm" onclick="quickCmd('hostname -I')">ip</button>
+        <button class="btn btn-sm" onclick="quickCmd('df -h')">df</button>
+        <button class="btn btn-sm" onclick="quickCmd('free -h')">free</button>
+    </div>
+</div>
+
+<!-- SYSTEM PANEL -->
+<div class="panel" id="panel-system">
+    <h2 class="panel-title">System Information</h2>
+    <button class="btn btn-primary" onclick="refreshSystemInfo()">Refresh</button>
+    <div class="grid-2" style="margin-top:15px">
+        <div class="card"><div class="card-title">CPU</div><div id="cpu-info"><span class="cmd-info">click refresh...</span></div></div>
+        <div class="card"><div class="card-title">Memory</div><div id="memory-info"><span class="cmd-info">click refresh...</span></div></div>
+        <div class="card"><div class="card-title">Disk</div><div id="disk-info"><span class="cmd-info">click refresh...</span></div></div>
+        <div class="card"><div class="card-title">Network</div><div id="network-info"><span class="cmd-info">click refresh...</span></div></div>
+    </div>
+</div>
+
+<!-- NETWORK PANEL -->
+<div class="panel" id="panel-network">
+    <h2 class="panel-title">Network Tools</h2>
+    <div class="card"><div class="card-title">Target</div><input type="text" id="network-target" class="input" value="google.com"></div>
+    <div class="grid-3">
+        <button class="btn" onclick="execNetworkCmd('ping')">Ping</button>
+        <button class="btn" onclick="execNetworkCmd('traceroute')">Traceroute</button>
+        <button class="btn" onclick="execNetworkCmd('nslookup')">Nslookup</button>
+        <button class="btn" onclick="execNetworkCmd('netstat')">Netstat</button>
+        <button class="btn" onclick="execNetworkCmd('whois')">Whois</button>
+        <button class="btn" onclick="execNetworkCmd('curl')">Headers</button>
+    </div>
+    <pre id="network-output" class="terminal-output" style="margin-top:15px"><span class="cmd-info">select a tool...</span></pre>
+</div>
+
+<!-- NMAP PANEL -->
+<div class="panel" id="panel-nmap">
+    <h2 class="panel-title">Nmap Port Scanner</h2>
+    <div class="card"><div class="card-title">Status</div><div id="nmap-install-status"><span class="cmd-info">checking...</span></div></div>
+    <div class="card"><div class="card-title">Config</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+            <div><label>Target:</label><input type="text" id="nmap-target" class="input" value="scanme.nmap.org"></div>
+            <div><label>Ports:</label><select id="nmap-ports" class="select"><option value="1-1000">1-1000</option><option value="common">Top 100</option><option value="all">All</option><option value="vuln">Vuln Scan</option></select></div>
+        </div>
+        <button class="btn btn-primary" onclick="startNmapScan()">Start</button>
+        <button class="btn btn-danger" onclick="cancelNmapScan()">Cancel</button>
+    </div>
+    <div class="terminal-output" id="nmap-output" style="height:400px;margin-top:15px"><span class="cmd-info">ready.</span></div>
+</div>
+
+<!-- WIFI PANEL -->
+<div class="panel" id="panel-wifi">
+    <h2 class="panel-title">WiFi Tools</h2>
+    <button class="btn btn-primary" onclick="refreshWifi()">Scan</button>
+    <div id="wifi-output" style="margin-top:15px"><span class="cmd-info">click scan...</span></div>
+</div>
+
+<!-- BROWSER PANEL -->
+<div class="panel" id="panel-browser">
+    <h2 class="panel-title">Browser Opener</h2>
+    <div class="card">
+        <label>Browser:</label><select id="browser-select" class="select"><option value="firefox">Firefox</option><option value="chromium">Chromium</option></select>
+        <label>URL:</label><input type="text" id="browser-url" class="input" value="https://google.com">
+        <button class="btn btn-primary" onclick="openBrowser()" style="margin-top:10px">Open</button>
+    </div>
+</div>
+
+<!-- QR PANEL -->
+<div class="panel" id="panel-qrcode">
+    <h2 class="panel-title">QR Generator</h2>
+    <div class="grid-2">
+        <div class="card">
+            <label>Text/URL:</label><textarea id="qr-text" class="input" rows="3">https://github.com</textarea>
+            <label>Style:</label><select id="qr-style" class="select"><option value="matrix">Matrix</option><option value="hacker">Hacker</option><option value="neon">Neon</option><option value="cyan">Cyan</option><option value="red">Red</option></select>
+            <button class="btn btn-primary" onclick="generateQR()">Generate</button>
+        </div>
+        <div class="card" style="text-align:center"><div id="qr-preview" style="min-height:300px"><span class="cmd-info">preview</span></div></div>
+    </div>
+</div>
+
+<!-- CLICKJACK PANEL -->
+<div class="panel" id="panel-clickjack">
+    <h2 class="panel-title">Clickjacking Tester</h2>
+    <div class="card">
+        <label>URL:</label><input type="text" id="clickjack-url" class="input" value="https://example.com">
+        <button class="btn btn-primary" onclick="testClickjack()">Test</button>
+    </div>
+    <div id="clickjack-result-card" style="display:none">
+        <div class="card" style="text-align:center"><div id="clickjack-verdict" style="font-size:2em"></div><div id="clickjack-summary"></div></div>
+        <div class="grid-2"><div class="card"><div class="card-title">Analysis</div><div id="clickjack-details"></div></div><div class="card"><div class="card-title">Recommendations</div><div id="clickjack-recommendations"></div></div></div>
+    </div>
+</div>
+
+<!-- IP WEAPON PANEL -->
+<div class="panel" id="panel-ipweapon">
+    <h2 class="panel-title">IP Weapon</h2>
+    <div class="grid-2">
+        <div class="card"><div class="card-title">Grabify</div><button class="btn btn-sm" onclick="quickOpen('https://grabify.link')">Open</button></div>
+        <div class="card"><div class="card-title">IPLogger</div><button class="btn btn-sm" onclick="quickOpen('https://iplogger.org')">Open</button></div>
+    </div>
+</div>
+
+<!-- SUBDOMAIN FINDER PANEL -->
+<div class="panel" id="panel-subdomain">
+    <h2 class="panel-title">Subdomain Finder</h2>
+    <div class="card">
+        <label>Domain:</label>
+        <input type="text" id="subdomain-domain" class="input" value="example.com">
+        <label>Method:</label>
+        <select id="subdomain-method" class="select">
+            <option value="all">crt.sh + DNS Bruteforce</option>
+            <option value="crt.sh">crt.sh Only</option>
+            <option value="dns">DNS Bruteforce Only</option>
+        </select>
+        <button class="btn btn-primary" onclick="findSubdomains()">Find</button>
+    </div>
+    <div class="terminal-output" id="subdomain-output" style="height:350px"><span class="cmd-info">ready.</span></div>
+</div>
+
+<!-- HASH ID & CRACKER PANEL -->
+<div class="panel" id="panel-hash">
+    <h2 class="panel-title">Hash Identifier & Cracker</h2>
+    <div class="card">
+        <label>Hash:</label>
+        <input type="text" id="hash-input" class="input" placeholder="enter hash...">
+        <button class="btn btn-primary" onclick="identifyHash()">Identify</button>
+        <button class="btn" onclick="crackHash()">Crack</button>
+    </div>
+    <div id="hash-result" style="margin-top:15px"><span class="cmd-info">enter a hash to identify.</span></div>
+</div>
+
+<!-- PASSWORD GENERATOR PANEL -->
+<div class="panel" id="panel-pwgen">
+    <h2 class="panel-title">Password Generator</h2>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-title">Options</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <label>Length: <input type="number" id="pw-length" class="input" value="16" min="4" max="128"></label>
+                <label>Count: <input type="number" id="pw-count" class="input" value="5" min="1" max="50"></label>
+            </div>
+            <div style="margin:10px 0">
+                <label><input type="checkbox" id="pw-upper" checked> Uppercase</label>
+                <label><input type="checkbox" id="pw-lower" checked> Lowercase</label>
+                <label><input type="checkbox" id="pw-numbers" checked> Numbers</label>
+                <label><input type="checkbox" id="pw-symbols" checked> Symbols</label>
+                <label><input type="checkbox" id="pw-similar"> Exclude Similar</label>
+            </div>
+            <button class="btn btn-primary" onclick="generatePasswords()">Generate</button>
+        </div>
+        <div class="card">
+            <div class="card-title">Passwords</div>
+            <div id="pw-output"><span class="cmd-info">click generate...</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- BANDWIDTH MONITOR PANEL -->
+<div class="panel" id="panel-bandwidth">
+    <h2 class="panel-title">Bandwidth Monitor</h2>
+    <div style="display:flex;gap:10px;margin-bottom:15px">
+        <button class="btn btn-primary" onclick="startBandwidth()">Start</button>
+        <button class="btn btn-danger" onclick="stopBandwidth()">Stop</button>
+    </div>
+    <div id="bandwidth-output"><span class="cmd-info">click start to monitor.</span></div>
+</div>
+
+<!-- DNS LOOKUP PANEL -->
+<div class="panel" id="panel-dns">
+    <h2 class="panel-title">DNS Record Lookup</h2>
+    <div class="card">
+        <label>Domain:</label>
+        <input type="text" id="dns-domain" class="input" value="google.com">
+        <label>Record Types:</label>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin:10px 0">
+            <label><input type="checkbox" class="dns-type" value="A" checked> A</label>
+            <label><input type="checkbox" class="dns-type" value="AAAA"> AAAA</label>
+            <label><input type="checkbox" class="dns-type" value="MX" checked> MX</label>
+            <label><input type="checkbox" class="dns-type" value="TXT" checked> TXT</label>
+            <label><input type="checkbox" class="dns-type" value="NS" checked> NS</label>
+            <label><input type="checkbox" class="dns-type" value="CNAME"> CNAME</label>
+            <label><input type="checkbox" class="dns-type" value="SOA"> SOA</label>
+            <label><input type="checkbox" class="dns-type" value="SRV"> SRV</label>
+            <label><input type="checkbox" class="dns-type" value="CAA"> CAA</label>
+        </div>
+        <button class="btn btn-primary" onclick="lookupDns()">Lookup</button>
+    </div>
+    <div id="dns-output"><span class="cmd-info">select types and lookup.</span></div>
+</div>
+
+<!-- ENCODER/DECODER PANEL -->
+<div class="panel" id="panel-encoder">
+    <h2 class="panel-title">Encode / Decode</h2>
+    <div class="card">
+        <label>Input:</label>
+        <textarea id="encoder-input" class="input" rows="4" placeholder="enter text..."></textarea>
+        <label>Type:</label>
+        <select id="encoder-type" class="select">
+            <option value="base64">Base64</option>
+            <option value="hex">Hex</option>
+            <option value="url">URL</option>
+            <option value="html">HTML Entities</option>
+            <option value="rot13">ROT13</option>
+            <option value="binary">Binary</option>
+        </select>
+        <div style="display:flex;gap:10px;margin-top:10px">
+            <button class="btn btn-primary" onclick="encodeText()">Encode</button>
+            <button class="btn" onclick="decodeText()">Decode</button>
+            <button class="btn btn-sm" onclick="document.getElementById('encoder-output').textContent='';document.getElementById('encoder-input').value=''">Clear</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-title">Output</div>
+        <pre id="encoder-output" style="white-space:pre-wrap;word-break:break-all"><span class="cmd-info">result here...</span></pre>
+    </div>
+</div>
+
+<!-- REVERSE IP PANEL -->
+<div class="panel" id="panel-reverseip">
+    <h2 class="panel-title">Reverse IP Lookup</h2>
+    <div class="card">
+        <label>IP Address or Domain:</label>
+        <input type="text" id="reverseip-target" class="input" value="8.8.8.8">
+        <button class="btn btn-primary" onclick="reverseIpLookup()">Lookup</button>
+        <button class="btn" onclick="reverseIpApi()">Via API</button>
+    </div>
+    <div id="reverseip-output"><span class="cmd-info">enter target and lookup.</span></div>
+</div>
+
+<!-- CTF TOOLS PANEL -->
+<div class="panel" id="panel-ctf">
+    <div class="ctf-header">
+        <h2 style="font-family:var(--font-mono);margin:0;font-size:1.3em;letter-spacing:2px;text-transform:uppercase">CTF Toolset</h2>
+        <span style="font-size:.8em;opacity:.5">capture the flag utilities</span>
+    </div>
+
+    <div class="ctf-tabs">
+        <button class="ctf-tab active" data-ctf-tab="forensic">Forensic</button>
+        <button class="ctf-tab" data-ctf-tab="crypto">Crypto</button>
+        <button class="ctf-tab" data-ctf-tab="pwn">PWN</button>
+        <button class="ctf-tab" data-ctf-tab="reverse">Reverse</button>
+    </div>
+
+    <div class="ctf-filebar">
+        <span style="font-size:.85em;opacity:.6">File:</span>
+        <input type="file" id="ctf-file-input" class="ctf-file-input">
+        <span class="ctf-file-name" id="ctf-file-name">none selected</span>
+        <button class="btn btn-sm" onclick="document.getElementById('ctf-file-input').click()">Browse</button>
+        <button class="btn btn-sm" onclick="clearCtfFile()">Clear</button>
+    </div>
+
+    <div class="ctf-panel active" id="ctf-panel-forensic">
+        <div class="ctf-cmd-grid">
+            <button class="ctf-cmd-btn" data-ctf-cmd="metadata">metadata</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="exif">exif</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="strings">strings</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="hidden">hidden</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="entropy">entropy</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="signature">signature</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="yara">yara</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="zip">zip</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="pcap">pcap</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="binwalk">binwalk</button>
+            <button class="ctf-cmd-btn ctf-cmd-all" data-ctf-cmd="all">all</button>
+        </div>
+    </div>
+
+    <div class="ctf-panel" id="ctf-panel-crypto">
+        <div class="ctf-cmd-grid">
+            <button class="ctf-cmd-btn" data-ctf-cmd="base64">base64</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="hex">hex</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="rot13">rot13</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="caesar">caesar</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="xor">xor</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="aes">aes</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="hash">hash</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="hashid">hashid</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="crack">crack</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="freq">freq</button>
+        </div>
+        <div class="ctf-cmd-input-row">
+            <input type="text" class="ctf-cmd-input" id="ctf-crypto-input" placeholder="enter data/text...">
+        </div>
+    </div>
+
+    <div class="ctf-panel" id="ctf-panel-pwn">
+        <div class="ctf-cmd-grid">
+            <button class="ctf-cmd-btn" data-ctf-cmd="pattern">pattern</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="offset">offset</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="elf">elf</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="rop">rop</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="shellcode">shellcode</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="template">template</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="checksec">checksec</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="asm">asm</button>
+        </div>
+        <div class="ctf-cmd-input-row">
+            <input type="text" class="ctf-cmd-input" id="ctf-pwn-input" placeholder="extra args (length, type, etc)...">
+        </div>
+    </div>
+
+    <div class="ctf-panel" id="ctf-panel-reverse">
+        <div class="ctf-cmd-grid">
+            <button class="ctf-cmd-btn" data-ctf-cmd="pe">pe</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="elf">elf</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="strings">strings</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="disasm">disasm</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="opcode">opcode</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="sections">sections</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="imports">imports</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="exports">exports</button>
+            <button class="ctf-cmd-btn" data-ctf-cmd="packer">packer</button>
+            <button class="ctf-cmd-btn ctf-cmd-all" data-ctf-cmd="all">all</button>
+        </div>
+    </div>
+
+    <div class="ctf-output" id="ctf-output">
+        <span style="opacity:.4">select a category and command.</span>
+    </div>
+</div>
+
+</div></div>
+<div class="toast-container" id="toast-container"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/main.js"></script>
+</body>
+</html>
