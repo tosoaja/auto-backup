@@ -1,4 +1,7 @@
 node_modules/
 temp_ctf/
+logs/
 *.log
 .env
+coverage/
+.backup/

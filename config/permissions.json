@@ -1,0 +1,38 @@
+{
+  "roles": {
+    "admin": ["*"],
+    "operator": [
+      "forensic.*",
+      "crypto.*",
+      "network.*",
+      "nmap.scan",
+      "subdomain.*",
+      "browser.open",
+      "system.*"
+    ],
+    "analyst": [
+      "forensic.read",
+      "crypto.read",
+      "crypto.decode",
+      "encoder.*",
+      "dns.read",
+      "hash.read",
+      "system.read"
+    ],
+    "guest": [
+      "system.read",
+      "dns.read",
+      "encoder.encode",
+      "forensic.read",
+      "crypto.decode"
+    ]
+  },
+  "defaultRole": "guest",
+  "permissions": {
+    "nmap.scan": { "description": "Run Nmap port scan", "risk": "high" },
+    "browser.open": { "description": "Open URL on server", "risk": "critical" },
+    "subdomain.*": { "description": "Subdomain enumeration", "risk": "medium" },
+    "forensic.write": { "description": "Upload files for forensic analysis", "risk": "medium" },
+    "system.*": { "description": "System operations", "risk": "high" }
+  }
+}
