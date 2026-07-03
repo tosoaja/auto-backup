@@ -1,0 +1,18 @@
+{
+  "name": "crypto",
+  "version": "1.0.0",
+  "description": "Cryptography tools - base64, hex, rot13, caesar, xor, aes, hash, hashid, crack, frequency analysis",
+  "permissions": ["crypto.read", "crypto.decode"],
+  "commands": [
+    { "name": "base64", "handler": "commands/base64.js", "async": false, "permission": "crypto.decode", "input": "text" },
+    { "name": "hex", "handler": "commands/hex.js", "async": false, "permission": "crypto.decode", "input": "text" },
+    { "name": "rot13", "handler": "commands/rot13.js", "async": false, "permission": "crypto.decode", "input": "text" },
+    { "name": "caesar", "handler": "commands/caesar.js", "async": false, "permission": "crypto.decode", "input": "text" },
+    { "name": "xor", "handler": "commands/xor.js", "async": false, "permission": "crypto.decode", "input": "text" },
+    { "name": "aes", "handler": "commands/aes.js", "async": false, "permission": "crypto.read", "input": "text" },
+    { "name": "hash", "handler": "commands/hash.js", "async": false, "permission": "crypto.read", "input": "text" },
+    { "name": "freq", "handler": "commands/freq.js", "async": false, "permission": "crypto.read", "input": "text" },
+    { "name": "hashid", "handler": "commands/hashid.js", "async": false, "permission": "crypto.read", "input": "text" },
+    { "name": "crack", "handler": "commands/crack.js", "async": true, "timeout": 120000, "permission": "crypto.read", "input": "text" }
+  ]
+}

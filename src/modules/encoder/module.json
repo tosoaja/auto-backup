@@ -1,0 +1,11 @@
+{
+  "name": "encoder",
+  "version": "1.0.0",
+  "description": "String encoding/decoding tools - base64, hex, url, html, unicode, binary, octal, rot13, reverse",
+  "permissions": ["encoder.encode", "encoder.decode"],
+  "commands": [
+    { "name": "encode", "handler": "commands/encode.js", "async": false, "permission": "encoder.encode", "input": "text", "description": "Encode text using specified encoding type" },
+    { "name": "decode", "handler": "commands/decode.js", "async": false, "permission": "encoder.decode", "input": "text", "description": "Decode text using specified encoding type" },
+    { "name": "list", "handler": "commands/list.js", "async": false, "permission": "encoder.encode", "input": "none", "description": "List all supported encoding types" }
+  ]
+}

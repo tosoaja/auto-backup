@@ -1,0 +1,27 @@
+{
+  "name": "forensic",
+  "version": "1.0.0",
+  "description": "Forensic analysis tools - metadata, exif, strings, entropy, signature, binwalk, pcap, zip, yara, hidden",
+  "author": "Toolkit Team",
+  "license": "MIT",
+  "dependencies": {},
+  "optionalDependencies": ["binwalk", "exiftool", "yara"],
+  "permissions": ["forensic.read", "forensic.write"],
+  "hooks": {
+    "onLoad": "onLoad",
+    "onUnload": "onUnload"
+  },
+  "commands": [
+    { "name": "metadata", "handler": "commands/metadata.js", "async": true, "timeout": 30000, "permission": "forensic.read", "input": "file", "description": "Show file metadata (stat, file type, exif)" },
+    { "name": "exif", "handler": "commands/exif.js", "async": true, "timeout": 30000, "permission": "forensic.read", "input": "file", "description": "Extract EXIF metadata from image files" },
+    { "name": "strings", "handler": "commands/strings.js", "async": true, "timeout": 30000, "permission": "forensic.read", "input": "file", "description": "Extract readable strings from binary files" },
+    { "name": "hidden", "handler": "commands/hidden.js", "async": true, "timeout": 30000, "permission": "forensic.read", "input": "file", "description": "Detect hidden data (ZIP in files, data after IEND, metadata)" },
+    { "name": "entropy", "handler": "commands/entropy.js", "async": false, "timeout": 10000, "permission": "forensic.read", "input": "file", "description": "Calculate Shannon entropy of file" },
+    { "name": "signature", "handler": "commands/signature.js", "async": true, "timeout": 10000, "permission": "forensic.read", "input": "file", "description": "Detect file type by magic bytes signature" },
+    { "name": "yara", "handler": "commands/yara.js", "async": true, "timeout": 60000, "permission": "forensic.read", "input": "file", "description": "Scan file with YARA rules" },
+    { "name": "zip", "handler": "commands/zip.js", "async": true, "timeout": 30000, "permission": "forensic.read", "input": "file", "description": "Analyze ZIP archive contents" },
+    { "name": "pcap", "handler": "commands/pcap.js", "async": true, "timeout": 60000, "permission": "forensic.read", "input": "file", "description": "Analyze PCAP network capture files" },
+    { "name": "binwalk", "handler": "commands/binwalk.js", "async": true, "timeout": 120000, "permission": "forensic.read", "input": "file", "description": "Scan firmware for embedded files (requires binwalk)" },
+    { "name": "all", "handler": "commands/all.js", "async": true, "timeout": 120000, "permission": "forensic.read", "input": "file", "description": "Run all forensic analyses" }
+  ]
+}
