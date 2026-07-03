@@ -25,7 +25,12 @@ async function main() {
     cors: config.server.cors || { origin: '*' }
   });
 
-  createSocketHandlers(io, config, { logger, eventBus, registry: loader.registry });
+  createSocketHandlers(io, config, {
+    logger, eventBus,
+    registry: loader.registry,
+    permissions: loader.permissions,
+    taskQueue: loader.taskQueue
+  });
 
   const PORT = process.env.PORT || config.server.port || 6969;
   const HOST = process.env.HOST || config.server.host || '0.0.0.0';

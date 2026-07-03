@@ -4,6 +4,8 @@ const Logger = require('./core/logger');
 const EventBus = require('./core/event-bus');
 const { CommandRegistry } = require('./core/command-registry');
 const { PluginEngine } = require('./core/plugin-engine');
+const { TaskQueue } = require('./core/task-queue');
+const { PermissionManager } = require('./core/permission-manager');
 
 class AppLoader {
   constructor() {
@@ -12,6 +14,8 @@ class AppLoader {
     this.eventBus = null;
     this.registry = null;
     this.pluginEngine = null;
+    this.taskQueue = null;
+    this.permissions = null;
     this._initialized = false;
   }
 
@@ -30,6 +34,38 @@ class AppLoader {
     });
 
     this.registry = new CommandRegistry();
+
+    const permConfig = configLoader.load('permissions');
+    this.permissions = new PermissionManager({
+      roles: permConfig.roles || {},
+      permissions: permConfig.permissions || {},
+      defaultRole: permConfig.defaultRole || 'guest'
+    });
+
+    this.logger.info('Permission manager ready', {
+      roles: this.permissions.roleNames()
+    });
+
+    this.taskQueue = new TaskQueue({
+      concurrency: this.config.taskQueue.concurrency || 3,
+      defaultTimeout: this.config.taskQueue.defaultTimeout || 300000
+    });
+
+    this.taskQueue.on('task:completed', ({ id, type, result, duration }) => {
+      this.logger.info(`Task completed: ${type}`, { taskId: id, duration });
+    });
+
+    this.taskQueue.on('task:failed', ({ id, type, error }) => {
+      this.logger.error(`Task failed: ${type}`, { taskId: id, error });
+    });
+
+    this.taskQueue.on('task:progress', ({ id, type, progress }) => {
+      this.eventBus.emit('task.progress', { taskId: id, type, progress });
+    });
+
+    this.logger.info('Task queue ready', {
+      concurrency: this.config.taskQueue.concurrency
+    });
 
     const scanDirs = [
       path.resolve(process.cwd(), 'src', 'modules')

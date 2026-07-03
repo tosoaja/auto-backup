@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const terminalHandler = require('../../routes/terminal');
 
-function createSocketHandlers(io, config, { logger, eventBus, registry }) {
+function createSocketHandlers(io, config, { logger, eventBus, registry, permissions, taskQueue }) {
   const activeNmapProcesses = new Map();
 
   io.on('connection', (socket) => {
@@ -18,7 +18,7 @@ function createSocketHandlers(io, config, { logger, eventBus, registry }) {
 
     socket.emit('client-info', { ip: clientIp, socketId: socket.id });
 
-    // New plugin-based command dispatch
+    // Plugin-based command dispatch with permission check
     socket.on('command', async (data) => {
       const { command, args, file, fileName } = data;
       if (!command) {
@@ -26,6 +26,7 @@ function createSocketHandlers(io, config, { logger, eventBus, registry }) {
         return;
       }
 
+      const user = socket.user || { role: 'guest' };
       let filePath = null;
       if (file) {
         const ext = fileName ? path.extname(fileName) || '.bin' : '.bin';
@@ -36,21 +37,91 @@ function createSocketHandlers(io, config, { logger, eventBus, registry }) {
       }
 
       try {
+        const cmdEntry = registry.find(command);
+        if (!cmdEntry) {
+          socket.emit('command:result', { success: false, command, error: `Command not found: ${command}` });
+          return;
+        }
+
+        if (permissions && cmdEntry.permission) {
+          await permissions.check(user, cmdEntry.permission);
+        }
+
         const context = {
           args: args || [],
           filePath,
           fileName,
           socket,
-          user: { role: 'admin' },
+          user,
           logger
         };
 
-        const result = await registry.execute(command, context);
-        socket.emit('command:result', result);
-        logger.command(socket.id, command, args, result);
+        // Route long-running commands through task queue
+        const isLongRunning = cmdEntry.async && cmdEntry.timeout > 5000;
+        if (isLongRunning && taskQueue) {
+          const registeredType = `cmd:${command}`;
+
+          if (!taskQueue._handlers.has(registeredType)) {
+            taskQueue.registerHandler(registeredType, async (data, emitProgress, socketId) => {
+              const result = await cmdEntry.handler(data.context);
+              return result;
+            });
+          }
+
+          const job = taskQueue.add({
+            type: registeredType,
+            data: { context },
+            socketId: socket.id,
+            priority: 0,
+            timeout: cmdEntry.timeout
+          });
+
+          socket.emit('command:queued', { command, taskId: job.id, position: 0 });
+          logger.command(socket.id, command, args, { queued: true, taskId: job.id });
+
+          const onCompleted = ({ id, result, duration }) => {
+            if (id === job.id) {
+              socket.emit('command:result', { success: true, command, data: result, duration, taskId: id });
+              logger.command(socket.id, command, args, { success: true, duration });
+            }
+          };
+
+          const onFailed = ({ id, error }) => {
+            if (id === job.id) {
+              socket.emit('command:result', { success: false, command, error, taskId: id });
+              logger.command(socket.id, command, args, { success: false, error });
+            }
+          };
+
+          const onProgress = ({ id, progress }) => {
+            if (id === job.id) {
+              socket.emit('command:progress', { command, progress, taskId: id });
+            }
+          };
+
+          taskQueue.on('task:completed', onCompleted);
+          taskQueue.on('task:failed', onFailed);
+          taskQueue.on('task:progress', onProgress);
+
+          socket.once('command:cancel', () => {
+            taskQueue.cancel(job.id);
+            taskQueue.off('task:completed', onCompleted);
+            taskQueue.off('task:failed', onFailed);
+            taskQueue.off('task:progress', onProgress);
+          });
+        } else {
+          const result = await registry.execute(command, context);
+          socket.emit('command:result', result);
+          logger.command(socket.id, command, args, result);
+        }
       } catch (err) {
-        socket.emit('command:result', { success: false, command, error: err.message });
-        logger.error(`Command failed: ${command}`, { error: err.message, socketId: socket.id });
+        if (err.code === 'PERMISSION_DENIED') {
+          socket.emit('command:result', { success: false, command, error: 'Permission denied', permission: err.permission });
+          logger.access(socket.id, command, err.permission, false);
+        } else {
+          socket.emit('command:result', { success: false, command, error: err.message });
+          logger.error(`Command failed: ${command}`, { error: err.message, socketId: socket.id });
+        }
       } finally {
         if (filePath && filePath.includes('temp_ctf')) {
           try { fs.unlinkSync(filePath); } catch {}
