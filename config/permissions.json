@@ -27,7 +27,7 @@
       "crypto.decode"
     ]
   },
-  "defaultRole": "guest",
+  "defaultRole": "admin",
   "permissions": {
     "nmap.scan": { "description": "Run Nmap port scan", "risk": "high" },
     "browser.open": { "description": "Open URL on server", "risk": "critical" },

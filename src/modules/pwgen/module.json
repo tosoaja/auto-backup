@@ -1,0 +1,1 @@
+{"name":"pwgen","version":"1.0.0","description":"Password generator with configurable length, charset, and strength","permissions":["pwgen.generate"],"commands":[{"name":"generate","handler":"commands/generate.js","async":false,"permission":"pwgen.generate","input":"text","description":"Generate passwords. Options: --length 16 --count 5 --symbols --numbers"}]}

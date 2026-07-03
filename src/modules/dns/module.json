@@ -1,0 +1,1 @@
+{"name":"dns","version":"1.0.0","description":"DNS record lookup (A, AAAA, MX, TXT, NS, CNAME, SOA, SRV, CAA)","permissions":["dns.read"],"commands":[{"name":"lookup","handler":"commands/lookup.js","async":true,"timeout":30000,"permission":"dns.read","input":"text","description":"Lookup DNS records for domain. Types: A,MX,TXT,NS,CNAME,SOA,AAAA"}]}

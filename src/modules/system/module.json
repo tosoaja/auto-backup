@@ -1,0 +1,1 @@
+{"name":"system","version":"1.0.0","description":"System information - CPU, memory, disk, network, OS, load","permissions":["system.read"],"commands":[{"name":"info","handler":"commands/info.js","async":true,"timeout":10000,"permission":"system.read","input":"none","description":"Get full system information"}]}

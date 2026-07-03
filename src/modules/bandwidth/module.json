@@ -1,0 +1,1 @@
+{"name":"bandwidth","version":"1.0.0","description":"Real-time network bandwidth monitor (/proc/net/dev)","permissions":["network.scan"],"commands":[{"name":"interfaces","handler":"commands/interfaces.js","async":false,"permission":"network.scan","input":"none","description":"List network interfaces with static info"}]}

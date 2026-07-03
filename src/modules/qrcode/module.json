@@ -1,0 +1,1 @@
+{"name":"qrcode","version":"1.0.0","description":"QR code generator","permissions":["qrcode.generate"],"commands":[{"name":"generate","handler":"commands/generate.js","async":true,"timeout":15000,"permission":"qrcode.generate","input":"text","description":"Generate QR code from text/URL"}]}

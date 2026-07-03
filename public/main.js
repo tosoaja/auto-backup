@@ -1,6 +1,5 @@
-// toolkit v3.1 - Main Client Script
 const state = { socket: null, connected: false, currentPanel: 'terminal', terminalHistory: [], historyIndex: -1 };
-let nmapInstalled = false, nmapScanning = false;
+let nmapInstalled = false;
 
 function createBufferedAppender(getContainer) {
     let buf = [], pending = false;
@@ -33,87 +32,31 @@ document.addEventListener('DOMContentLoaded', () => {
     initSocket();
     initNavigation();
     initTerminal();
+    initCtfTabs();
+    initCtfFileInput();
+    initCtfCommands();
 });
 
 function initSocket() {
     state.socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
+
     state.socket.on('connect', () => { state.connected = true; updateConnectionStatus('connected'); showToast('connected', 'success'); });
     state.socket.on('disconnect', () => { state.connected = false; updateConnectionStatus('disconnected'); });
     state.socket.on('command-output', (d) => appendTerminal(d.output, d.type));
     state.socket.on('command-complete', () => {});
-    state.socket.on('system-info', displaySystemInfo);
-    state.socket.on('network-info', displayNetworkOutput);
-    state.socket.on('wifi-info', displayWifiInfo);
-    state.socket.on('browser-opened', () => showToast('opened', 'info'));
-    state.socket.on('nmap-status', (d) => { nmapInstalled = d.installed; document.getElementById('nmap-install-status').innerHTML = d.installed ? '<span class="badge badge-success">installed</span>' : '<span class="badge badge-error">not installed</span> ' + d.message; });
-    state.socket.on('nmap-output', (d) => { appendNmapBuf(d.output + '\n', d.type || 'stdout'); });
-    state.socket.on('nmap-complete', () => { nmapScanning = false; });
-    state.socket.on('qr-result', (d) => { if (d.success) { document.getElementById('qr-preview').innerHTML = `<img src="${d.dataUrl}" style="max-width:300px;border:1px solid #444;border-radius:4px">`; } });
-    state.socket.on('clickjack-result', (d) => {
-        document.getElementById('clickjack-result-card').style.display = 'block';
-        document.getElementById('clickjack-verdict').innerHTML = `${d.verdictIcon||''} ${d.verdict}`;
-        document.getElementById('clickjack-verdict').style.color = d.verdictColor;
-        document.getElementById('clickjack-summary').textContent = d.summary;
-        let det = ''; d.details.forEach(x => { det += `<div style="padding:6px;border-left:2px solid ${x.status==='PASS'?'#4a9a6a':'#c84a4a'};margin:4px 0"><strong>${x.check}</strong>: ${x.value||'N/A'}</div>`; });
-        document.getElementById('clickjack-details').innerHTML = det;
-        let rec = ''; d.recommendations.forEach(r => { rec += `<div style="padding:4px;color:var(--text-warning)">${r}</div>`; });
-        document.getElementById('clickjack-recommendations').innerHTML = rec || 'none';
-    });
-    state.socket.on('client-info', (d) => { document.getElementById('client-ip').textContent = d.ip; });
 
-    // Subdomain
-    state.socket.on('subdomain-result', (d) => {
-        if (!d.success) {
-            appendSubdomainBuf(`[${d.source||d.method}] Error: ${d.error}\n`, 'cmd-error');
-            return;
-        }
-        if (d.method === 'crt.sh' || d.source === 'crt.sh') {
-            appendSubdomainBuf(`[crt.sh] Found ${d.total} subdomains\n`, 'cmd-info');
-            if (d.subdomains) d.subdomains.forEach(s => appendSubdomainBuf(`  ${s}\n`, 'stdout'));
-        } else if (d.method === 'dns' || d.source === 'dns-bruteforce') {
-            appendSubdomainBuf(`[DNS] Found ${d.total} subdomains\n`, 'cmd-info');
-            if (d.subdomains) d.subdomains.forEach(s => appendSubdomainBuf(`  ${s.subdomain} (${(s.ips||[]).join(', ')})\n`, 'stdout'));
-        }
+    // New unified command dispatch
+    state.socket.on('command:result', handleCommandResult);
+    state.socket.on('command:queued', (d) => {
+        const o = document.getElementById('ctf-output');
+        if (o) o.innerHTML = `<span style="color:var(--text-info)">[queued] ${d.command} (task: ${d.taskId})</span>\n`;
     });
-    state.socket.on('subdomain-output', (d) => {
-        appendSubdomainBuf(d.output + '\n', 'cmd-' + d.type);
+    state.socket.on('command:progress', (d) => {
+        const o = document.getElementById('ctf-output');
+        if (o) o.innerHTML = `<span style="color:var(--text-secondary)">[progress] ${d.command}: ${d.progress}%</span>\n`;
     });
 
-    // Hash
-    state.socket.on('hash-result', (d) => {
-        const o = document.getElementById('hash-result');
-        if (!d.success) { o.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; }
-        let html = '<div class="card"><div class="card-title">Analysis</div>';
-        html += `<div class="info-row"><span class="info-label">Hash</span><span class="info-value">${d.hash}</span></div>`;
-        html += `<div class="info-row"><span class="info-label">Length</span><span class="info-value">${d.length}</span></div>`;
-        html += `<div class="info-row"><span class="info-label">Charset</span><span class="info-value">${d.charset}</span></div>`;
-        if (d.possibleTypes && d.possibleTypes.length) {
-            html += `<div class="info-row"><span class="info-label">Types</span><span class="info-value">${d.possibleTypes.map(t => t.name).join(', ')}</span></div>`;
-        }
-        if (d.cracked) {
-            html += `<div class="info-row"><span class="info-label" style="color:#4a9a6a">Cracked</span><span class="info-value" style="color:#4a9a6a;font-size:1.1em">${d.password}</span></div>`;
-        } else if (d.cracked === false) {
-            html += `<div class="info-row"><span class="info-label" style="color:#c84a4a">Not cracked</span><span class="info-value">try a larger wordlist</span></div>`;
-        }
-        html += '</div>';
-        o.innerHTML = html;
-    });
-
-    // Password Generator
-    state.socket.on('password-result', (d) => {
-        const o = document.getElementById('pw-output');
-        if (!d.success) { o.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; }
-        let html = `<div class="card"><div class="card-title">Generated ${d.count}</div>`;
-        html += `<div class="info-row"><span class="info-label">Length</span><span class="info-value">${d.length}</span></div>`;
-        html += `<div class="info-row"><span class="info-label">Entropy</span><span class="info-value">${d.entropy} bits (${d.strength})</span></div>`;
-        html += '</div>';
-        d.passwords.forEach((p, i) => {
-            html += `<div style="padding:6px;margin:4px 0;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:3px;font-family:monospace;font-size:1em" onclick="navigator.clipboard.writeText('${p.replace(/'/g, "\\'")}')">${i+1}. ${p}</div>`;
-        });
-        o.innerHTML = html;
-    });
-
-    // Bandwidth
+    // Streaming events
     state.socket.on('bandwidth-data', (d) => {
         const o = document.getElementById('bandwidth-output');
         let html = '<div class="card"><div class="card-title">Traffic</div>';
@@ -125,79 +68,91 @@ function initSocket() {
         html += '</div>';
         o.innerHTML = html;
     });
+    state.socket.on('subdomain-output', (d) => {
+        appendSubdomainBuf(d.output + '\n', 'cmd-' + d.type);
+    });
+    state.socket.on('client-info', (d) => { document.getElementById('client-ip').textContent = d.ip; });
+    state.socket.on('server-message', (d) => {
+        if (d.type === 'info') showToast(d.message, 'info');
+    });
+}
+
+function handleCommandResult(d) {
+    if (!d.success) {
+        showToast(d.error || 'Command failed', 'error');
+        return;
+    }
+    const cmd = d.command;
+
+    // System
+    if (cmd === 'system.info') { displaySystemInfo(d.data); return; }
+
+    // Network
+    if (cmd.startsWith('network.')) { displayNetworkOutput(d.data); return; }
+
+    // Wi-Fi
+    if (cmd === 'wifi.profiles') { displayWifiInfo(d.data); return; }
+
+    // Browser
+    if (cmd === 'browser.open') { showToast('opened', 'info'); return; }
+
+    // Nmap check
+    if (cmd === 'nmap.scan') {
+        const txt = typeof d.data === 'object' ? JSON.stringify(d.data, null, 2) : String(d.data);
+        document.getElementById('nmap-output').innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(txt)}</pre>`;
+        return;
+    }
+    if (cmd === 'nmap.check') {
+        nmapInstalled = d.data.installed;
+        document.getElementById('nmap-install-status').innerHTML = d.data.installed
+            ? '<span class="badge badge-success">installed</span>'
+            : '<span class="badge badge-error">not installed</span> ' + (d.data.message || '');
+        return;
+    }
+
+    // QR
+    if (cmd === 'qrcode.generate') {
+        document.getElementById('qr-preview').innerHTML = `<img src="${d.data.dataUrl}" style="max-width:300px;border:1px solid #444;border-radius:4px">`;
+        return;
+    }
+
+    // Clickjack
+    if (cmd === 'clickjack.test') { displayClickjackResult(d.data); return; }
+
+    // Subdomain
+    if (cmd === 'subdomain.crtsh' || cmd === 'subdomain.bruteforce') { displaySubdomainResult(d.data, cmd); return; }
+
+    // Hash
+    if (cmd === 'hashid.identify' || cmd === 'hashid.crack') { displayHashResult(d.data); return; }
+
+    // Password generator
+    if (cmd === 'pwgen.generate') { displayPasswordResult(d.data); return; }
 
     // DNS
-    state.socket.on('dns-result', (d) => {
-        const o = document.getElementById('dns-output');
-        if (!d.success) { o.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; }
-        let html = `<div class="card"><div class="card-title">DNS Records for ${d.domain}</div>`;
-        for (const [type, data] of Object.entries(d.records)) {
-            html += `<div style="margin:8px 0"><strong style="color:var(--text-info)">${type}</strong>: `;
-            if (data.status === 'found') {
-                if (Array.isArray(data.data)) {
-                    html += data.data.map(item => {
-                        if (typeof item === 'object') return JSON.stringify(item);
-                        return item;
-                    }).join(', ');
-                } else if (typeof data.data === 'object') {
-                    html += JSON.stringify(data.data);
-                } else {
-                    html += data.data;
-                }
-            } else {
-                html += `<span class="cmd-warning">${data.status}</span>`;
-            }
-            html += '</div>';
-        }
-        html += `<div class="info-row"><span class="info-label">Time</span><span class="info-value">${d.timestamp}</span></div>`;
-        html += '</div>';
-        o.innerHTML = html;
-    });
+    if (cmd === 'dns.lookup') { displayDnsResult(d.data); return; }
 
     // Encoder
-    state.socket.on('encoder-result', (d) => {
-        const o = document.getElementById('encoder-output');
-        if (!d.success) { o.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; }
-        o.innerHTML = `<div class="card"><div class="card-title">${d.direction === 'encode' ? 'Encoded' : 'Decoded'} (${d.type})</div>`;
-        o.innerHTML += `<div class="info-row"><span class="info-label">Input</span><span class="info-value" style="word-break:break-all">${d.input}</span></div>`;
-        o.innerHTML += `<div class="info-row"><span class="info-label">Output</span><span class="info-value" style="word-break:break-all;color:var(--text-primary)">${d.output}</span></div></div>`;
-    });
+    if (cmd === 'encoder.encode') { displayEncoderResult(d.data, 'encode'); return; }
+    if (cmd === 'encoder.decode') { displayEncoderResult(d.data, 'decode'); return; }
 
     // Reverse IP
-    state.socket.on('reverseip-result', (d) => {
-        const o = document.getElementById('reverseip-output');
-        if (!d.success) { o.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; }
-        let html = `<div class="card"><div class="card-title">Reverse IP: ${d.target}</div>`;
-        if (d.methods) {
-            for (const [method, data] of Object.entries(d.methods)) {
-                html += `<div style="margin:6px 0"><strong style="color:var(--text-info)">${method}</strong>: `;
-                if (data.success) {
-                    html += (data.hostnames||[]).join(', ') || data.ip || 'none';
-                } else {
-                    html += `<span class="cmd-warning">${data.error||'no result'}</span>`;
-                }
-                html += '</div>';
-            }
-        }
-        if (d.query) {
-            html += `<div class="info-row"><span class="info-label">ISP</span><span class="info-value">${d.isp||'N/A'}</span></div>`;
-            html += `<div class="info-row"><span class="info-label">Org</span><span class="info-value">${d.org||'N/A'}</span></div>`;
-            html += `<div class="info-row"><span class="info-label">Country</span><span class="info-value">${d.country||'N/A'}</span></div>`;
-        }
-        html += '</div>';
-        o.innerHTML = html;
-    });
+    if (cmd === 'reverseip.ptr' || cmd === 'reverseip.api') { displayReverseIpResult(d.data); return; }
 
-    // CTF Tools
-    state.socket.on('ctf-output', (d) => {
-      const o = document.getElementById('ctf-output');
-      if (!o) return;
-      if (d.type === 'error') {
-        o.innerHTML = `<span style="color:var(--text-error)">${d.output}</span>`;
-      } else {
-        o.innerHTML = `<span style="color:var(--text-secondary)">$ ${d.command}</span>\n<pre style="margin:4px 0;white-space:pre-wrap;word-break:break-all">${d.output}</pre>`;
-      }
-    });
+    // CTF commands (forensic, crypto, pwn, reverse) — show raw output
+    const ctfPrefixes = ['forensic.', 'crypto.', 'pwn.', 'reverse.'];
+    for (const prefix of ctfPrefixes) {
+        if (cmd.startsWith(prefix)) {
+            displayCtfOutputRaw(d.data);
+            return;
+        }
+    }
+
+    // Fallback: show as string
+    const o = document.getElementById('ctf-output');
+    if (o) {
+        const txt = typeof d.data === 'object' ? JSON.stringify(d.data, null, 2) : String(d.data);
+        o.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(txt)}</pre>`;
+    }
 }
 
 function updateConnectionStatus(s) {
@@ -221,8 +176,22 @@ function switchPanel(p) {
     if (btn) btn.classList.add('active');
     state.currentPanel = p;
     if (p === 'system') refreshSystemInfo();
-    if (p === 'nmap') state.socket.emit('nmap-check');
+    if (p === 'nmap') sendCommand('nmap.check');
     if (p === 'wifi') refreshWifi();
+}
+
+function sendCommand(cmd, args, file, fileName) {
+    if (state.connected) {
+        state.socket.emit('command', { command: cmd, args: args || [], file: file || null, fileName: fileName || null });
+    } else {
+        showToast('not connected', 'error');
+    }
+}
+
+function escapeHtml(t) {
+    const div = document.createElement('div');
+    div.textContent = t;
+    return div.innerHTML;
 }
 
 function initTerminal() {
@@ -237,14 +206,17 @@ function initTerminal() {
 function executeCommand(cmd) {
     state.terminalHistory.push(cmd);
     appendTerminal(`\n$ ${cmd}\n`, 'stdout');
-    const builtin = { '/help': () => appendTerminal('/help /clear /sysinfo /net /nmap /wifi /qr /clickjack /ip /browser /subdomain /hash /pwgen /bandwidth /dns /encode /reverseip\n', 'cmd-info'), '/clear': () => document.getElementById('terminal-output').innerHTML = '',
+    const builtin = {
+        '/help': () => appendTerminal('/help /clear /sysinfo /net /nmap /wifi /qr /clickjack /ip /browser /subdomain /hash /pwgen /bandwidth /dns /encode /reverseip\n', 'cmd-info'),
+        '/clear': () => document.getElementById('terminal-output').innerHTML = '',
         '/sysinfo': () => switchPanel('system'), '/net': () => switchPanel('network'), '/nmap': () => switchPanel('nmap'),
         '/wifi': () => switchPanel('wifi'), '/qr': () => switchPanel('qrcode'), '/clickjack': () => switchPanel('clickjack'),
         '/ip': () => switchPanel('ipweapon'), '/browser': () => switchPanel('browser'),
         '/subdomain': () => switchPanel('subdomain'), '/hash': () => switchPanel('hash'),
         '/pwgen': () => switchPanel('pwgen'), '/bandwidth': () => switchPanel('bandwidth'),
         '/dns': () => switchPanel('dns'), '/encode': () => switchPanel('encoder'),
-        '/reverseip': () => switchPanel('reverseip') };
+        '/reverseip': () => switchPanel('reverseip')
+    };
     const c = cmd.split(' ')[0];
     if (builtin[c]) { builtin[c](); return; }
     if (state.connected) state.socket.emit('execute-command', { command: cmd, sessionId: state.socket.id });
@@ -255,9 +227,9 @@ function navigateHistory(d) { const input = document.getElementById('terminal-in
 
 function quickCmd(cmd) { document.getElementById('terminal-input').value = cmd; executeCommand(cmd); switchPanel('terminal'); }
 
-function refreshSystemInfo() { if (state.connected) state.socket.emit('get-system-info'); }
+function refreshSystemInfo() { sendCommand('system.info'); }
 function displaySystemInfo(d) {
-    if (d.error) return;
+    if (!d) return;
     document.getElementById('cpu-info').innerHTML = `<div class="info-row"><span class="info-label">CPU</span><span class="info-value">${d.system.brand}</span></div><div class="info-row"><span class="info-label">Cores</span><span class="info-value">${d.system.cores} / ${d.system.threads}</span></div><div class="info-row"><span class="info-label">Load</span><span class="info-value">${d.system.load}</span></div>`;
     document.getElementById('memory-info').innerHTML = `<div class="info-row"><span class="info-label">Total</span><span class="info-value">${d.memory.total}</span></div><div class="info-row"><span class="info-label">Used</span><span class="info-value">${d.memory.used}</span></div><div class="info-row"><span class="info-label">Usage</span><span class="info-value">${d.memory.usage}</span></div>`;
     let dHtml = ''; if (d.disk) d.disk.forEach(x => { dHtml += `<div class="info-row"><span class="info-label">${x.mount}</span><span class="info-value">${x.used} / ${x.size}</span></div>`; });
@@ -266,21 +238,66 @@ function displaySystemInfo(d) {
     document.getElementById('network-info').innerHTML = nHtml;
 }
 
-function execNetworkCmd(cmd) { const t = document.getElementById('network-target').value || 'localhost'; if (state.connected) { document.getElementById('network-output').innerHTML = '<span class="cmd-info">executing...</span>'; state.socket.emit('get-network-info', { command: cmd, target: t }); } }
-function displayNetworkOutput(d) { document.getElementById('network-output').innerHTML = `<span class="cmd-info">${d.command}</span>\n${d.output}`; }
+function execNetworkCmd(cmd) {
+    const t = document.getElementById('network-target').value || 'localhost';
+    document.getElementById('network-output').innerHTML = '<span class="cmd-info">executing...</span>';
+    sendCommand('network.' + cmd, [t]);
+}
+function displayNetworkOutput(data) {
+    const txt = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+    document.getElementById('network-output').innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(txt)}</pre>`;
+}
 
-function startNmapScan() { if (!nmapInstalled) { showToast('install nmap first', 'error'); return; } const t = document.getElementById('nmap-target').value.trim(); const p = document.getElementById('nmap-ports').value; if (!t) { showToast('enter target', 'error'); return; } document.getElementById('nmap-output').innerHTML = ''; nmapScanning = true; state.socket.emit('nmap-scan', { target: t, ports: p }); }
-function cancelNmapScan() { if (nmapScanning) { state.socket.emit('nmap-cancel'); nmapScanning = false; } }
+function startNmapScan() {
+    if (!nmapInstalled) { showToast('install nmap first', 'error'); return; }
+    const t = document.getElementById('nmap-target').value.trim();
+    const p = document.getElementById('nmap-ports').value;
+    if (!t) { showToast('enter target', 'error'); return; }
+    document.getElementById('nmap-output').innerHTML = '<span class="cmd-info">scanning...</span>';
+    sendCommand('nmap.scan', [t, p || '1-1000']);
+}
+function cancelNmapScan() { showToast('already completed', 'info'); }
 
-function refreshWifi() { if (state.connected) state.socket.emit('get-wifi-info'); }
-function displayWifiInfo(d) { const c = document.getElementById('wifi-output'); if (d.error) { c.innerHTML = `<span class="cmd-error">${d.error}</span>`; return; } let h = `<div class="card"><div class="card-title">${d.total} Profiles</div>`; if (d.profiles) d.profiles.forEach(p => { h += `<div class="info-row"><span>${p.name}</span><span>${p.type}</span></div>`; }); h += '</div>'; c.innerHTML = h; }
+function refreshWifi() { sendCommand('wifi.profiles'); }
+function displayWifiInfo(d) {
+    const c = document.getElementById('wifi-output');
+    if (!d || d.error) { c.innerHTML = `<span class="cmd-error">${d?.error || 'No data'}</span>`; return; }
+    let h = `<div class="card"><div class="card-title">${d.total} Profiles</div>`;
+    if (d.profiles) d.profiles.forEach(p => { h += `<div class="info-row"><span>${p.name}</span><span>${p.type}</span></div>`; });
+    h += '</div>'; c.innerHTML = h;
+}
 
-function openBrowser() { const u = document.getElementById('browser-url').value; const b = document.getElementById('browser-select').value; if (state.connected) state.socket.emit('open-browser', { url: u, browser: b }); }
+function openBrowser() {
+    const u = document.getElementById('browser-url').value;
+    const b = document.getElementById('browser-select').value;
+    sendCommand('browser.open', [b, u]);
+}
 function quickOpen(url) { document.getElementById('browser-url').value = url; openBrowser(); }
 
-function generateQR() { const t = document.getElementById('qr-text').value.trim(); const s = document.getElementById('qr-style').value; if (!t) { showToast('enter text', 'error'); return; } state.socket.emit('qr-generate', { text: t, style: s }); }
+function generateQR() {
+    const t = document.getElementById('qr-text').value.trim();
+    const s = document.getElementById('qr-style').value;
+    if (!t) { showToast('enter text', 'error'); return; }
+    sendCommand('qrcode.generate', [t, s]);
+}
 
-function testClickjack() { const u = document.getElementById('clickjack-url').value.trim(); if (!u) { showToast('enter URL', 'error'); return; } document.getElementById('clickjack-result-card').style.display = 'block'; document.getElementById('clickjack-verdict').innerHTML = 'testing...'; state.socket.emit('clickjack-test', { url: u }); }
+function testClickjack() {
+    const u = document.getElementById('clickjack-url').value.trim();
+    if (!u) { showToast('enter URL', 'error'); return; }
+    document.getElementById('clickjack-result-card').style.display = 'block';
+    document.getElementById('clickjack-verdict').innerHTML = 'testing...';
+    sendCommand('clickjack.test', [u]);
+}
+
+function displayClickjackResult(d) {
+    document.getElementById('clickjack-result-card').style.display = 'block';
+    document.getElementById('clickjack-verdict').innerHTML = d.verdict;
+    document.getElementById('clickjack-summary').textContent = d.summary;
+    let det = ''; d.details.forEach(x => { det += `<div style="padding:6px;border-left:2px solid ${x.status==='PASS'?'#4a9a6a':'#c84a4a'};margin:4px 0"><strong>${x.check}</strong>: ${x.value||'N/A'}</div>`; });
+    document.getElementById('clickjack-details').innerHTML = det;
+    let rec = ''; d.recommendations.forEach(r => { rec += `<div style="padding:4px;color:var(--text-warning)">${r}</div>`; });
+    document.getElementById('clickjack-recommendations').innerHTML = rec || 'none';
+}
 
 function showToast(msg, type) { const c = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = `toast toast-${type}`; t.textContent = msg; c.appendChild(t); setTimeout(() => { if (t.parentNode) t.remove(); }, 3000); }
 function confirmShutdown() { if (confirm('Shutdown server?')) showToast('use Ctrl+C in terminal', 'info'); }
@@ -291,7 +308,18 @@ function findSubdomains() {
     const method = document.getElementById('subdomain-method').value;
     if (!domain) { showToast('enter domain', 'error'); return; }
     document.getElementById('subdomain-output').innerHTML = `<span class="cmd-info">Searching ${domain} via ${method}...</span>\n`;
-    state.socket.emit('subdomain-find', { domain, method });
+    if (method === 'crt.sh' || method === 'all') sendCommand('subdomain.crtsh', [domain]);
+    if (method === 'dns' || method === 'all') sendCommand('subdomain.bruteforce', [domain]);
+}
+
+function displaySubdomainResult(d, cmd) {
+    if (!d.success) {
+        appendSubdomainBuf(`[${cmd}] Error: ${d.error}\n`, 'cmd-error');
+        return;
+    }
+    const method = cmd === 'subdomain.crtsh' ? 'crt.sh' : 'dns';
+    appendSubdomainBuf(`[${method}] Found ${d.total} subdomains\n`, 'cmd-info');
+    if (d.subdomains) d.subdomains.forEach(s => appendSubdomainBuf(`  ${typeof s === 'string' ? s : s.subdomain + ' (' + (s.ips||[]).join(', ') + ')'}\n`, 'stdout'));
 }
 
 // Hash Identifier & Cracker
@@ -299,13 +327,31 @@ function identifyHash() {
     const hash = document.getElementById('hash-input').value.trim();
     if (!hash) { showToast('enter hash', 'error'); return; }
     document.getElementById('hash-result').innerHTML = '<span class="cmd-info">identifying...</span>';
-    state.socket.emit('hash-identify', { hash });
+    sendCommand('hashid.identify', [hash]);
 }
 function crackHash() {
     const hash = document.getElementById('hash-input').value.trim();
     if (!hash) { showToast('enter hash', 'error'); return; }
     document.getElementById('hash-result').innerHTML = '<span class="cmd-info">cracking...</span>';
-    state.socket.emit('hash-crack', { hash });
+    sendCommand('hashid.crack', [hash]);
+}
+function displayHashResult(d) {
+    const o = document.getElementById('hash-result');
+    if (!d) { o.innerHTML = '<span class="cmd-error">No result</span>'; return; }
+    let html = '<div class="card"><div class="card-title">Analysis</div>';
+    html += `<div class="info-row"><span class="info-label">Hash</span><span class="info-value">${d.hash}</span></div>`;
+    html += `<div class="info-row"><span class="info-label">Length</span><span class="info-value">${d.length}</span></div>`;
+    if (d.charset) html += `<div class="info-row"><span class="info-label">Charset</span><span class="info-value">${d.charset}</span></div>`;
+    if (d.possibleTypes && d.possibleTypes.length) {
+        html += `<div class="info-row"><span class="info-label">Types</span><span class="info-value">${d.possibleTypes.map(t => t.name).join(', ')}</span></div>`;
+    }
+    if (d.cracked) {
+        html += `<div class="info-row"><span class="info-label" style="color:#4a9a6a">Cracked</span><span class="info-value" style="color:#4a9a6a;font-size:1.1em">${d.password}</span></div>`;
+    } else if (d.cracked === false) {
+        html += `<div class="info-row"><span class="info-label" style="color:#c84a4a">Not cracked</span><span class="info-value">try a larger wordlist</span></div>`;
+    }
+    html += '</div>';
+    o.innerHTML = html;
 }
 
 // Password Generator
@@ -319,7 +365,25 @@ function generatePasswords() {
         excludeSimilar: document.getElementById('pw-similar').checked,
         count: parseInt(document.getElementById('pw-count').value) || 5
     };
-    state.socket.emit('password-generate', { options });
+    const args = ['--length', String(options.length), '--count', String(options.count)];
+    if (!options.uppercase) args.push('--noupper');
+    if (!options.lowercase) args.push('--nolower');
+    if (!options.numbers) args.push('--nonumbers');
+    if (!options.symbols) args.push('--nosymbols');
+    if (options.excludeSimilar) args.push('--nosimilar');
+    sendCommand('pwgen.generate', args);
+}
+function displayPasswordResult(d) {
+    const o = document.getElementById('pw-output');
+    if (!d) { o.innerHTML = '<span class="cmd-error">No result</span>'; return; }
+    let html = `<div class="card"><div class="card-title">Generated ${d.count}</div>`;
+    html += `<div class="info-row"><span class="info-label">Length</span><span class="info-value">${d.length}</span></div>`;
+    html += `<div class="info-row"><span class="info-label">Entropy</span><span class="info-value">${d.entropy} bits (${d.strength})</span></div>`;
+    html += '</div>';
+    d.passwords.forEach((p, i) => {
+        html += `<div style="padding:6px;margin:4px 0;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:3px;font-family:monospace;font-size:1em" onclick="navigator.clipboard.writeText('${p.replace(/'/g, "\\'")}')">${i+1}. ${p}</div>`;
+    });
+    o.innerHTML = html;
 }
 
 // Bandwidth
@@ -339,7 +403,30 @@ function lookupDns() {
     const types = Array.from(document.querySelectorAll('.dns-type:checked')).map(cb => cb.value);
     if (!types.length) { showToast('select at least one record type', 'error'); return; }
     document.getElementById('dns-output').innerHTML = '<span class="cmd-info">looking up...</span>';
-    state.socket.emit('dns-lookup', { domain, types });
+    sendCommand('dns.lookup', [domain, types.join(',')]);
+}
+function displayDnsResult(d) {
+    const o = document.getElementById('dns-output');
+    if (!d) { o.innerHTML = '<span class="cmd-error">No result</span>'; return; }
+    let html = `<div class="card"><div class="card-title">DNS Records for ${d.domain}</div>`;
+    for (const [type, data] of Object.entries(d.records)) {
+        html += `<div style="margin:8px 0"><strong style="color:var(--text-info)">${type}</strong>: `;
+        if (data.status === 'found') {
+            if (Array.isArray(data.data)) {
+                html += data.data.map(item => typeof item === 'object' ? JSON.stringify(item) : item).join(', ');
+            } else if (typeof data.data === 'object') {
+                html += JSON.stringify(data.data);
+            } else {
+                html += data.data;
+            }
+        } else {
+            html += `<span class="cmd-warning">${data.status}</span>`;
+        }
+        html += '</div>';
+    }
+    html += `<div class="info-row"><span class="info-label">Time</span><span class="info-value">${d.timestamp}</span></div>`;
+    html += '</div>';
+    o.innerHTML = html;
 }
 
 // Encoder/Decoder
@@ -348,14 +435,24 @@ function encodeText() {
     const type = document.getElementById('encoder-type').value;
     if (!text) { showToast('enter text', 'error'); return; }
     document.getElementById('encoder-output').innerHTML = '<span class="cmd-info">encoding...</span>';
-    state.socket.emit('encoder-encode', { type, text });
+    sendCommand('encoder.encode', [type, text]);
 }
 function decodeText() {
     const text = document.getElementById('encoder-input').value;
     const type = document.getElementById('encoder-type').value;
     if (!text) { showToast('enter text', 'error'); return; }
     document.getElementById('encoder-output').innerHTML = '<span class="cmd-info">decoding...</span>';
-    state.socket.emit('encoder-decode', { type, text });
+    sendCommand('encoder.decode', [type, text]);
+}
+function displayEncoderResult(data, direction) {
+    const o = document.getElementById('encoder-output');
+    const label = direction === 'encode' ? 'Encoded' : 'Decoded';
+    if (typeof data === 'object' && data.error) {
+        o.innerHTML = `<span class="cmd-error">${data.error}</span>`;
+        return;
+    }
+    o.innerHTML = `<div class="card"><div class="card-title">${label}</div>`;
+    o.innerHTML += `<div class="info-row"><span class="info-label">Output</span><span class="info-value" style="word-break:break-all;color:var(--text-primary)">${escapeHtml(data)}</span></div></div>`;
 }
 
 // Reverse IP
@@ -363,13 +460,36 @@ function reverseIpLookup() {
     const target = document.getElementById('reverseip-target').value.trim();
     if (!target) { showToast('enter target', 'error'); return; }
     document.getElementById('reverseip-output').innerHTML = '<span class="cmd-info">looking up...</span>';
-    state.socket.emit('reverseip-lookup', { target });
+    sendCommand('reverseip.ptr', [target]);
 }
 function reverseIpApi() {
     const target = document.getElementById('reverseip-target').value.trim();
     if (!target) { showToast('enter target', 'error'); return; }
     document.getElementById('reverseip-output').innerHTML = '<span class="cmd-info">looking up via API...</span>';
-    state.socket.emit('reverseip-api', { ip: target });
+    sendCommand('reverseip.api', [target]);
+}
+function displayReverseIpResult(d) {
+    const o = document.getElementById('reverseip-output');
+    if (!d) { o.innerHTML = '<span class="cmd-error">No result</span>'; return; }
+    let html = `<div class="card"><div class="card-title">Reverse IP: ${d.target || d.ip || d.query || ''}</div>`;
+    if (d.methods) {
+        for (const [method, data] of Object.entries(d.methods)) {
+            html += `<div style="margin:6px 0"><strong style="color:var(--text-info)">${method}</strong>: `;
+            if (data.success !== false) {
+                html += (data.hostnames||[]).join(', ') || data.ip || 'none';
+            } else {
+                html += `<span class="cmd-warning">${data.error||'no result'}</span>`;
+            }
+            html += '</div>';
+        }
+    }
+    if (d.isp || d.org || d.country) {
+        html += `<div class="info-row"><span class="info-label">ISP</span><span class="info-value">${d.isp||'N/A'}</span></div>`;
+        html += `<div class="info-row"><span class="info-label">Org</span><span class="info-value">${d.org||'N/A'}</span></div>`;
+        html += `<div class="info-row"><span class="info-label">Country</span><span class="info-value">${d.country||'N/A'}</span></div>`;
+    }
+    html += '</div>';
+    o.innerHTML = html;
 }
 
 // CTF Tools
@@ -432,23 +552,24 @@ function executeCtfCommand(category, cmd, extra) {
 
   let fullCmd = cmd;
   if (extra) fullCmd += ' ' + extra;
+  const args = fullCmd.split(/\s+/);
+  const moduleCmd = `${category}.${args[0]}`;
+  const cmdArgs = args.slice(1);
 
-  if (state.socket && state.connected) {
-    state.socket.emit('ctf-execute', {
-      category,
-      command: fullCmd,
-      file: ctfFileData,
-      fileName: ctfFileName
-    });
-  } else {
-    output.innerHTML = '<span style="color:var(--text-error)">[!] not connected</span>';
+  const hasFileInput = ['forensic', 'pwn', 'reverse'].includes(category);
+  if (hasFileInput && !ctfFileData) {
+    output.innerHTML = '<span style="color:var(--text-warning)">[!] select a file first</span>';
+    return;
   }
+
+  sendCommand(moduleCmd, cmdArgs, ctfFileData, ctfFileName);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  initCtfTabs();
-  initCtfFileInput();
-  initCtfCommands();
-});
+function displayCtfOutputRaw(data) {
+  const o = document.getElementById('ctf-output');
+  if (!o) return;
+  const txt = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+  o.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all">${escapeHtml(txt)}</pre>`;
+}
 
 setInterval(() => { document.getElementById('server-time').textContent = new Date().toLocaleTimeString(); }, 1000);

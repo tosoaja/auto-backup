@@ -1,0 +1,1 @@
+{"name":"browser","version":"1.0.0","description":"Open URLs in browser on the server","permissions":["browser.open"],"commands":[{"name":"open","handler":"commands/open.js","async":false,"permission":"browser.open","input":"text","description":"Open URL in system browser"}]}

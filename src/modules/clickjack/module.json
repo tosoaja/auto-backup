@@ -1,0 +1,1 @@
+{"name":"clickjack","version":"1.0.0","description":"Clickjacking vulnerability tester","permissions":["network.scan"],"commands":[{"name":"test","handler":"commands/test.js","async":true,"timeout":30000,"permission":"network.scan","input":"text","description":"Test URL for clickjacking vulnerability"}]}

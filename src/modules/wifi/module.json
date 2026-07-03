@@ -1,0 +1,1 @@
+{"name":"wifi","version":"1.0.0","description":"Wi-Fi profile listing (nmcli)","permissions":["network.scan"],"commands":[{"name":"profiles","handler":"commands/profiles.js","async":true,"timeout":15000,"permission":"network.scan","input":"none","description":"List saved Wi-Fi profiles"}]}
